@@ -18,15 +18,27 @@ export default function CalculadoraPonto() {
     return `${ano}-${mes}-${dia}`;
   };
 
-  // Histórico e Batidas Dinâmicas
+  // Histórico, Batidas e Toast
   const [batidas, setBatidas] = useState(['', '', '', '']);
   const [dataRegistro, setDataRegistro] = useState(getHojeFormatado());
   const [justificativa, setJustificativa] = useState('');
+  
+  // Estado do nosso novo Alerta Bonito (Toast)
+  const [toast, setToast] = useState({ show: false, message: '' });
   
   const [historico, setHistorico] = useState(() => {
     const dadosSalvos = localStorage.getItem('historicoPonto');
     return dadosSalvos ? JSON.parse(dadosSalvos) : {};
   });
+
+  // Função para exibir a notificação flutuante
+  const mostrarNotificacao = (mensagem) => {
+    setToast({ show: true, message: mensagem });
+    // Esconde automaticamente após 3.5 segundos
+    setTimeout(() => {
+      setToast({ show: false, message: mensagem });
+    }, 3500);
+  };
 
   const timeToMinutes = (timeStr) => {
     if (!timeStr || !timeStr.includes(':')) return null;
@@ -106,14 +118,11 @@ export default function CalculadoraPonto() {
     setTargetType('9');
   };
 
-  // --- NOVA LÓGICA DO BOTÃO DE SUGESTÃO ---
   const preencherSugestao = () => {
     if (targetType === '8') {
-      // Sugestão para Sexta-feira (8h)
       setBatidas(['07:00', '12:00', '13:00', '16:00']);
     } else {
-      // Sugestão padrão diária (9h)
-      setTargetType('9'); // Garante que 9h fique selecionado
+      setTargetType('9');
       setBatidas(['07:00', '12:00', '13:00', '17:00']);
     }
   };
@@ -135,7 +144,9 @@ export default function CalculadoraPonto() {
     };
     setHistorico(novoHistorico);
     localStorage.setItem('historicoPonto', JSON.stringify(novoHistorico));
-    alert(`✅ Registro do dia ${dataFormatada} salvo/atualizado com sucesso!`);
+    
+    // Substituímos o alert() feio pela nossa notificação elegante
+    mostrarNotificacao(`Registro do dia ${dataFormatada} salvo com sucesso!`);
   };
 
   const editarRegistro = (dataBR) => {
@@ -152,6 +163,17 @@ export default function CalculadoraPonto() {
     }
   };
 
+  const apagarRegistro = (dataBR) => {
+    if (window.confirm(`Tem certeza que deseja apagar permanentemente o registro do dia ${dataBR}?`)) {
+      const novoHistorico = { ...historico };
+      delete novoHistorico[dataBR];
+      setHistorico(novoHistorico);
+      localStorage.setItem('historicoPonto', JSON.stringify(novoHistorico));
+      
+      mostrarNotificacao(`O registro do dia ${dataBR} foi excluído.`);
+    }
+  };
+
   const getTurnConfig = (index) => {
     if (index === 0) return { label: '1º Turno (Entrada)', icon: <Sun className="w-4 h-4 text-amber-400" /> };
     if (index === 1) return { label: 'Saída Almoço', icon: <Utensils className="w-4 h-4 text-orange-400" /> };
@@ -164,7 +186,7 @@ export default function CalculadoraPonto() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col p-4 sm:p-6 lg:p-8 font-sans antialiased relative">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col p-4 sm:p-6 lg:p-8 font-sans antialiased relative overflow-x-hidden">
       <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
         <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl"></div>
         <div className="absolute top-1/2 -right-40 w-96 h-96 bg-emerald-600/10 rounded-full blur-3xl"></div>
@@ -216,7 +238,6 @@ export default function CalculadoraPonto() {
           {targetType === 'custom' && (
             <div className="pt-2 flex items-center gap-3 bg-slate-950/60 p-3 rounded-xl border border-slate-800 mt-2">
               <label className="text-xs text-slate-300">Duração diária desejada:</label>
-              {/* O truque [color-scheme:dark] foi adicionado em todos os inputs de data e hora */}
               <input type="time" value={customHours} onChange={(e) => setCustomHours(e.target.value)} className="bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-indigo-500 [color-scheme:dark]" />
             </div>
           )}
@@ -248,7 +269,7 @@ export default function CalculadoraPonto() {
           </button>
           {batidas.length > 4 && (
             <button onClick={removerTurno} className="flex-1 py-3 rounded-xl border border-dashed border-rose-900/50 text-rose-500/70 hover:text-rose-400 hover:border-rose-500/50 hover:bg-rose-500/5 transition-all flex items-center justify-center gap-2 text-sm font-medium">
-              <Trash2 className="w-4 h-4" /> Remover Útimo Turno Adicionado
+              <Trash2 className="w-4 h-4" /> Remover Último Turno Adicionado
             </button>
           )}
         </div>
@@ -339,7 +360,7 @@ export default function CalculadoraPonto() {
           </section>
         )}
 
-        {/* Histórico Local com Lápis de Edição */}
+        {/* Histórico Local */}
         <div className="mt-12 pt-8 border-t border-slate-800/60">
           <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center uppercase tracking-wider">
             <Clock className="w-4 h-4 mr-2 text-indigo-400" /> Histórico (Neste Aparelho)
@@ -359,19 +380,28 @@ export default function CalculadoraPonto() {
                         <span className="font-bold text-slate-200">{data}</span>
                         <span className="text-[11px] px-2 py-1 bg-slate-950 text-slate-400 rounded-md border border-slate-800">Meta: {dados.cargaHoraria}</span>
                       </div>
-                      <button 
-                        onClick={() => editarRegistro(data)}
-                        className="p-1.5 text-slate-500 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors border border-transparent group-hover:border-slate-700"
-                        title="Editar este registro"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
+                      <div className="flex gap-1">
+                        <button 
+                          onClick={() => editarRegistro(data)}
+                          className="p-1.5 text-slate-500 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors border border-transparent group-hover:border-slate-700"
+                          title="Editar este registro"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => apagarRegistro(data)}
+                          className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors border border-transparent group-hover:border-slate-700"
+                          title="Apagar este registro"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {dados.batidas.map((hora, idx) => {
                         if (!hora) return null;
                         const isEntrada = idx % 2 === 0;
-                        const turnoNum = Math.floor(idx / 2) + 1; // 1, 2, 3...
+                        const turnoNum = Math.floor(idx / 2) + 1;
                         return (
                           <span key={idx} className={`text-xs font-mono px-2 py-1 rounded border ${isEntrada ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20' : 'bg-orange-500/10 text-orange-300 border-orange-500/20'}`}>
                             <strong className="opacity-70">{isEntrada ? `E${turnoNum}:` : `S${turnoNum}:`}</strong> {hora}
@@ -410,6 +440,21 @@ export default function CalculadoraPonto() {
         </div>
 
       </div>
+
+      {/* --- TOAST NOTIFICATION (Aviso elegante flutuante) --- */}
+      <div 
+        className={`fixed bottom-6 right-6 sm:bottom-10 sm:right-10 z-50 transition-all duration-500 transform ${
+          toast.show ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0 pointer-events-none'
+        }`}
+      >
+        <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700/80 shadow-2xl shadow-indigo-500/10 rounded-2xl p-4 flex items-center gap-3">
+          <div className="bg-emerald-500/20 p-1.5 rounded-full">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+          </div>
+          <p className="text-sm font-medium text-slate-200 pr-2">{toast.message}</p>
+        </div>
+      </div>
+      
     </div>
   );
 }
