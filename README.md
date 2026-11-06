@@ -1,16 +1,40 @@
-# React + Vite
+# 👑 Calculadora de Ponto V PRO
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+![Status](https://img.shields.io/badge/Status-Concluído-success?style=for-the-badge)
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-B73BFE?style=for-the-badge&logo=vite&logoColor=FFD62E)
 
-Currently, two official plugins are available:
+> Uma aplicação web moderna e inteligente para gestão de expediente, cálculo de horas trabalhadas e previsão exata do horário de encerramento da jornada.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+### 🔗 **[Aceder à Aplicação (Vercel)](#)** *(Substitua o # pelo seu link da Vercel)*
 
-## React Compiler
+---
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+<div align="center">
+  <img src="./src/assets/preview.png" alt="Interface da Calculadora de Ponto V PRO" width="800">
+</div>
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## ✨ Funcionalidades
+
+* **Cálculo de Previsão de Saída:** Descubra a hora exata da sua saída sem ultrapassar nem dever minutos.
+* **Jornadas Flexíveis:** Suporte nativo para padrão de 9h diárias, 8h (sexta-feira) e horários personalizados.
+* **Múltiplos Turnos Dinâmicos:** Adicione e remova entradas e saídas extras conforme a necessidade do dia.
+* **Dashboard Analítico:** Barras de progresso e detalhamento de minutos trabalhados e restantes.
+* **Histórico Offline:** Os seus registos diários ficam guardados diretamente no seu aparelho (LocalStorage), sem precisar de base de dados.
+* **UI/UX Premium:** Interface moderna em *Dark Mode* de alto contraste, com efeitos de *Glassmorphism* e gradientes luminosos.
+
+## 🚀 Tecnologias Utilizadas
+
+* **[React](https://reactjs.org/)** (Frontend)
+* **[Vite](https://vitejs.dev/)** (Build Tool)
+* **[Tailwind CSS](https://tailwindcss.com/)** (Estilização)
+* **[Lucide React](https://lucide.dev/)** (Ícones SVG)
+
+## ⚙️ Como executar o projeto localmente
+
+1. Clone este repositório:
+```bash
+git clone [https://github.com/SEU-USUARIO/meu-ponto-v-pro.git](https://github.com/SEU-USUARIO/meu-ponto-v-pro.git)
