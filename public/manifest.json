@@ -7,9 +7,9 @@
   "theme_color": "#020617",
   "icons": [
     {
-      "src": "/icone-ponto.png",
+      "src": "/icone-ponto.jpg",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/jpeg"
     }
   ]
 }

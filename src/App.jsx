@@ -12,7 +12,6 @@ import {
   Trash2,
   Plus,
   Heart,
-  Zap,
   FileText,
   Sparkles,
   Pencil,
@@ -33,9 +32,11 @@ export default function CalculadoraPonto() {
   const [targetType, setTargetType] = useState("9")
   const [customHours, setCustomHours] = useState("08:48")
 
-  useEffect(() => {
-    if (dataRegistro) {
-      const [ano, mes, dia] = dataRegistro.split("-").map(Number)
+  // Função que lida com a mudança de data e já define a jornada corretamente sem usar useEffect
+  const handleMudancaData = (novaData) => {
+    setDataRegistro(novaData)
+    if (novaData) {
+      const [ano, mes, dia] = novaData.split("-").map(Number)
       const dataObj = new Date(ano, mes - 1, dia)
       const diaSemana = dataObj.getDay()
 
@@ -45,7 +46,7 @@ export default function CalculadoraPonto() {
         setTargetType("9")
       }
     }
-  }, [dataRegistro])
+  }
 
   const [batidas, setBatidas] = useState(["", "", "", ""])
   const [justificativa, setJustificativa] = useState("")
@@ -325,7 +326,7 @@ export default function CalculadoraPonto() {
             <input
               type="date"
               value={dataRegistro}
-              onChange={(e) => setDataRegistro(e.target.value)}
+              onChange={(e) => handleMudancaData(e.target.value)}
               className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all [color-scheme:dark]"
             />
           </div>
