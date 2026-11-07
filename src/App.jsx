@@ -1,681 +1,471 @@
-import { useState, useMemo, useEffect } from "react"
-import {
-  Clock,
-  Sun,
-  Utensils,
-  Briefcase,
-  LogOut,
-  Calendar,
-  RotateCcw,
-  CheckCircle2,
-  Save,
-  Trash2,
-  Plus,
-  Heart,
-  FileText,
-  Sparkles,
-  Pencil,
-  Bell,
+import React, { useState, useEffect } from 'react';
+import { 
+  Clock, 
+  Calendar, 
+  Plus, 
+  Trash2, 
+  CheckCircle2, 
+  History, 
+  Calculator, 
   Crown,
-} from "lucide-react"
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react';
 
-export default function CalculadoraPonto() {
-  const getHojeFormatado = () => {
-    const data = new Date()
-    const ano = data.getFullYear()
-    const mes = String(data.getMonth() + 1).padStart(2, "0")
-    const dia = String(data.getDate()).padStart(2, "0")
-    return `${ano}-${mes}-${dia}`
-  }
+export default function App() {
+  const [activeTab, setActiveTab] = useState('calc'); // 'calc' | 'history'
+  
+  // Data atual formatada YYYY-MM-DD
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [selectedDate, setSelectedDate] = useState(todayStr);
 
-  const [dataRegistro, setDataRegistro] = useState(getHojeFormatado())
-  const [targetType, setTargetType] = useState("9")
-  const [customHours, setCustomHours] = useState("08:48")
+  // Turnos do dia selecionado: [{ id, entry, exit }]
+  const [shifts, setShifts] = useState([
+    { id: 1, entry: '07:00', exit: '12:00' },
+    { id: 2, entry: '13:00', exit: '' }
+  ]);
 
+  const [justification, setJustification] = useState('');
+  
+  // Histórico salvo no localStorage: { 'YYYY-MM-DD': { shifts: [...], totalMinutes: X, targetMinutes: Y, justification: '...' } }
+  const [history, setHistory] = useState(() => {
+    try {
+      const saved = localStorage.getItem('v_ponto_history');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      return {};
+    }
+  });
+
+  // Estado para controlar quais meses estão expandidos no histórico (Ex: { '2026-11': true })
+  const [expandedMonths, setExpandedMonths] = useState({});
+
+  // Salvar histórico sempre que mudar
   useEffect(() => {
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission()
+    try {
+      localStorage.setItem('v_ponto_history', JSON.stringify(history));
+    } catch (e) {
+      console.error("Erro ao salvar no localStorage", e);
     }
-  }, [])
+  }, [history]);
 
-  const handleMudancaData = (novaData) => {
-    setDataRegistro(novaData)
-    if (novaData) {
-      const [ano, mes, dia] = novaData.split("-").map(Number)
-      const dataObj = new Date(ano, mes - 1, dia)
-      const diaSemana = dataObj.getDay()
-
-      if (diaSemana === 5) {
-        setTargetType("8")
-      } else if (diaSemana >= 1 && diaSemana <= 4) {
-        setTargetType("9")
-      }
-    }
-  }
-
-  const [batidas, setBatidas] = useState(["", "", "", ""])
-  const [justificativa, setJustificativa] = useState("")
-  const [toast, setToast] = useState({ show: false, message: "" })
-
-  const [historico, setHistorico] = useState(() => {
-    const dadosSalvos = localStorage.getItem("historicoPonto")
-    return dadosSalvos ? JSON.parse(dadosSalvos) : {}
-  })
-
-  const dispararNotificacaoNativa = (titulo, corpo) => {
-    setToast({ show: true, message: corpo })
-    setTimeout(() => {
-      setToast({ show: false, message: "" })
-    }, 6000)
-
-    if ("Notification" in window && Notification.permission === "granted") {
-      try {
-        new Notification(titulo, {
-          body: corpo,
-          icon: "/icone-ponto.png",
-          badge: "/icone-ponto.png",
-          vibrate: [500, 200, 500, 200, 500],
-          requireInteraction: true,
-        })
-      } catch (e) {
-        console.log("Notificação nativa bloqueada ou erro:", e)
-      }
-    }
-  }
-
-  const timeToMinutes = (timeStr) => {
-    if (!timeStr || !timeStr.includes(":")) return null
-    const [h, m] = timeStr.split(":").map(Number)
-    return isNaN(h) || isNaN(m) ? null : h * 60 + m
-  }
-
-  const formatMinutesHuman = (minutes) => {
-    if (
-      minutes === null ||
-      isNaN(minutes) ||
-      minutes === undefined ||
-      minutes < 0
-    )
-      return "0h 00min"
-    const h = Math.floor(minutes / 60)
-    const m = Math.floor(minutes % 60)
-    return `${h}h ${String(m).padStart(2, "0")}min`
-  }
-
-  const formatarMinutosParaHora = (totalMinutos) => {
-    const horas = Math.floor(totalMinutos / 60)
-    const minutos = Math.floor(totalMinutos % 60)
-    return `${String(horas).padStart(2, "0")}:${String(minutos).padStart(2, "0")}`
-  }
-
-  const targetMinutes = useMemo(() => {
-    if (targetType === "9") return 9 * 60
-    if (targetType === "8") return 8 * 60
-    const custom = timeToMinutes(customHours)
-    return custom !== null && custom > 0 ? custom : 8 * 60
-  }, [targetType, customHours])
-
-  let sugestaoSaida = null
-  let minutosTrabalhados = 0
-  let ultimaEntrada = 0
-  let aguardandoSaida = false
-
-  for (let i = 0; i < batidas.length; i += 2) {
-    const entrada = timeToMinutes(batidas[i])
-    const saida = timeToMinutes(batidas[i + 1])
-
-    if (entrada !== null && saida !== null) {
-      minutosTrabalhados += saida - entrada
-    } else if (entrada !== null && saida === null) {
-      ultimaEntrada = entrada
-      aguardandoSaida = true
-    }
-  }
-
-  const minutosRestantes = Math.max(0, targetMinutes - minutosTrabalhados)
-  const progressPercent = Math.min(
-    100,
-    Math.round((minutosTrabalhados / targetMinutes) * 100),
-  )
-
-  const minutosManha =
-    batidas[0] && batidas[1]
-      ? timeToMinutes(batidas[1]) - timeToMinutes(batidas[0])
-      : 0
-  const minutosAlmoco =
-    batidas[1] && batidas[2]
-      ? timeToMinutes(batidas[2]) - timeToMinutes(batidas[1])
-      : 0
-
-  if (aguardandoSaida && minutosRestantes > 0) {
-    const horaSaidaReal = ultimaEntrada + minutosRestantes
-    sugestaoSaida = formatarMinutosParaHora(horaSaidaReal)
-  }
-
-  // --- ALGORITMO DE ALVO EXATO (Calcula a hora exata e agenda o alarme) ---
+  // Quando mudar a data, carregar os turnos dela se existirem
   useEffect(() => {
-    // 1. Calcula o minuto exato de retorno do almoço (se houver saída para almoço registrada e não houver retorno)
-    let alvoAlmocoMinutos = null
-    if (batidas[1] && !batidas[2]) {
-      const minSaidaAlmoco = timeToMinutes(batidas[1])
-      if (minSaidaAlmoco !== null) {
-        alvoAlmocoMinutos = minSaidaAlmoco + 60 // Ex: 12:20 + 60min = 740 (13:20)
-      }
-    }
-
-    // 2. Calcula o minuto exato de fim de expediente
-    let alvoFimMinutos = null
-    if (sugestaoSaida && aguardandoSaida) {
-      alvoFimMinutos = timeToMinutes(sugestaoSaida)
-    }
-
-    // Monitora a cada 10 segundos apenas comparando se o minuto atual alcançou o alvo calculado
-    const intervalo = setInterval(() => {
-      const agora = new Date()
-      const minutoAtualTotal = agora.getHours() * 60 + agora.getMinutes()
-
-      if (
-        alvoAlmocoMinutos !== null &&
-        minutoAtualTotal === alvoAlmocoMinutos
-      ) {
-        dispararNotificacaoNativa(
-          "Calculadora de Ponto V PRO",
-          "🍽️ Passou 1h exata do seu almoço! Hora de registrar o retorno.",
-        )
-        alvoAlmocoMinutos = null // Dispara apenas uma vez por evento
-      }
-
-      if (alvoFimMinutos !== null && minutoAtualTotal === alvoFimMinutos) {
-        dispararNotificacaoNativa(
-          "Calculadora de Ponto V PRO",
-          `⏰ Expediente concluído! Hora de bater o ponto de saída (${sugestaoSaida}).`,
-        )
-        alvoFimMinutos = null // Dispara apenas uma vez por evento
-      }
-    }, 10000)
-
-    return () => clearInterval(intervalo)
-  }, [batidas, sugestaoSaida, aguardandoSaida])
-
-  const atualizarBatida = (index, valor) => {
-    const novasBatidas = [...batidas]
-    novasBatidas[index] = valor
-    setBatidas(novasBatidas)
-  }
-
-  const adicionarTurno = () => setBatidas([...batidas, "", ""])
-
-  const removerTurno = () => {
-    if (batidas.length > 4) {
-      const novasBatidas = [...batidas]
-      novasBatidas.splice(-2, 2)
-      setBatidas(novasBatidas)
-    }
-  }
-
-  const limparDia = () => {
-    setBatidas(["", "", "", ""])
-    setJustificativa("")
-    setDataRegistro(getHojeFormatado())
-    setTargetType("9")
-  }
-
-  const preencherSugestao = () => {
-    const [ano, mes, dia] = dataRegistro.split("-").map(Number)
-    const dataObj = new Date(ano, mes - 1, dia)
-    const isSexta = dataObj.getDay() === 5
-
-    if (isSexta || targetType === "8") {
-      setTargetType("8")
-      setBatidas(["07:00", "12:00", "13:00", "16:00"])
-      dispararNotificacaoNativa(
-        "Ponto V PRO",
-        "Sugestão aplicada para Sexta-feira (8h)!",
-      )
+    if (history[selectedDate]) {
+      setShifts(history[selectedDate].shifts || [{ id: Date.now(), entry: '', exit: '' }]);
+      setJustification(history[selectedDate].justification || '');
     } else {
-      setTargetType("9")
-      setBatidas(["07:00", "12:00", "13:00", "17:00"])
-      dispararNotificacaoNativa(
-        "Ponto V PRO",
-        "Sugestão aplicada para padrão diário (9h)!",
-      )
-    }
-  }
-
-  const salvarDia = () => {
-    const [ano, mes, dia] = dataRegistro.split("-")
-    const dataFormatada = `${dia}/${mes}/${ano}`
-
-    const novoHistorico = {
-      ...historico,
-      [dataFormatada]: {
-        batidas,
-        cargaHoraria: formatMinutesHuman(targetMinutes),
-        targetType,
-        customHours,
-        data: dataFormatada,
-        justificativa: justificativa.trim(),
-      },
-    }
-    setHistorico(novoHistorico)
-    localStorage.setItem("historicoPonto", JSON.stringify(novoHistorico))
-    dispararNotificacaoNativa(
-      "Ponto V PRO",
-      `Registro do dia ${dataFormatada} salvo com sucesso!`,
-    )
-  }
-
-  const editarRegistro = (dataBR) => {
-    const registro = historico[dataBR]
-    if (registro) {
-      const [dia, mes, ano] = dataBR.split("/")
-      setDataRegistro(`${ano}-${mes}-${dia}`)
-      setBatidas(registro.batidas || ["", "", "", ""])
-      setJustificativa(registro.justificativa || "")
-      if (registro.targetType) setTargetType(registro.targetType)
-      if (registro.customHours) setCustomHours(registro.customHours)
-
-      window.scrollTo({ top: 0, behavior: "smooth" })
-    }
-  }
-
-  const apagarRegistro = (dataBR) => {
-    if (
-      window.confirm(
-        `Tem certeza que deseja apagar permanentemente o registro do dia ${dataBR}?`,
-      )
-    ) {
-      const novoHistorico = { ...historico }
-      delete novoHistorico[dataBR]
-      setHistorico(novoHistorico)
-      localStorage.setItem("historicoPonto", JSON.stringify(novoHistorico))
-      dispararNotificacaoNativa(
-        "Ponto V PRO",
-        `O registro do dia ${dataBR} foi excluído.`,
-      )
-    }
-  }
-
-  const getTurnConfig = (index) => {
-    if (index === 0)
-      return {
-        label: "1º Turno (Entrada)",
-        icon: <Sun className="w-4 h-4 text-amber-400" />,
+      const dayOfWeek = new Date(selectedDate + 'T00:00:00').getDay();
+      if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+        setShifts([
+          { id: 1, entry: '07:00', exit: '12:00' },
+          { id: 2, entry: '13:00', exit: '' }
+        ]);
+      } else {
+        setShifts([{ id: 1, entry: '', exit: '' }]);
       }
-    if (index === 1)
-      return {
-        label: "Saída Almoço",
-        icon: <Utensils className="w-4 h-4 text-orange-400" />,
-      }
-    if (index === 2)
-      return {
-        label: "Retorno Almoço",
-        icon: <RotateCcw className="w-4 h-4 text-blue-400" />,
-      }
-    if (index === 3)
-      return {
-        label: "Saída (Fim)",
-        icon: <LogOut className="w-4 h-4 text-indigo-400" />,
-      }
-    return {
-      label:
-        index % 2 === 0
-          ? `Entrada Extra ${Math.floor(index / 2)}`
-          : `Saída Extra ${Math.floor(index / 2)}`,
-      icon: <Clock className="w-4 h-4 text-slate-400" />,
+      setJustification('');
     }
-  }
+  }, [selectedDate]);
+
+  // Determinar meta diária com base no dia da semana (Seg-Qui = 9h / 540m, Sex = 8h / 480m)
+  const getTargetMinutesForDate = (dateStr) => {
+    const d = new Date(dateStr + 'T00:00:00');
+    const dayOfWeek = d.getDay();
+    if (dayOfWeek === 5) return 480; // Sexta-feira: 8h
+    if (dayOfWeek >= 1 && dayOfWeek <= 4) return 540; // Seg-Qui: 9h
+    return 0; // Fim de semana
+  };
+
+  const targetMinutes = getTargetMinutesForDate(selectedDate);
+
+  // Manipulação de turnos
+  const handleAddShift = () => {
+    setShifts([...shifts, { id: Date.now(), entry: '', exit: '' }]);
+  };
+
+  const handleRemoveShift = (id) => {
+    if (shifts.length === 1) {
+      setShifts([{ id: Date.now(), entry: '', exit: '' }]);
+    } else {
+      setShifts(shifts.filter(s => s.id !== id));
+    }
+  };
+
+  const handleShiftChange = (id, field, value) => {
+    setShifts(shifts.map(s => s.id === id ? { ...s, [field]: value } : s));
+  };
+
+  // Conversões e cálculos de tempo
+  const timeToMinutes = (timeStr) => {
+    if (!timeStr) return 0;
+    const [h, m] = timeStr.split(':').map(Number);
+    return (h || 0) * 60 + (m || 0);
+  };
+
+  const minutesToHoursAndMinutes = (totalMins) => {
+    const isNegative = totalMins < 0;
+    const absMins = Math.abs(totalMins);
+    const h = Math.floor(absMins / 60);
+    const m = absMins % 60;
+    return `${isNegative ? '-' : ''}${h}h ${m}m`;
+  };
+
+  const calculateTotalWorkedMinutes = () => {
+    let total = 0;
+    shifts.forEach(shift => {
+      if (shift.entry && shift.exit) {
+        const start = timeToMinutes(shift.entry);
+        const end = timeToMinutes(shift.exit);
+        if (end > start) {
+          total += (end - start);
+        }
+      }
+    });
+    return total;
+  };
+
+  const totalWorkedMinutes = calculateTotalWorkedMinutes();
+  const balanceMinutes = totalWorkedMinutes - targetMinutes;
+
+  const calculateEstimatedExit = () => {
+    const lastShift = shifts[shifts.length - 1];
+    if (!lastShift || !lastShift.entry || lastShift.exit) return null;
+
+    let completedMins = 0;
+    shifts.slice(0, -1).forEach(s => {
+      if (s.entry && s.exit) {
+        const start = timeToMinutes(s.entry);
+        const end = timeToMinutes(s.exit);
+        if (end > start) completedMins += (end - start);
+      }
+    });
+
+    const remainingNeeded = targetMinutes - completedMins;
+    if (remainingNeeded <= 0) return 'Meta já atingida!';
+
+    const entryMins = timeToMinutes(lastShift.entry);
+    const exitMins = entryMins + remainingNeeded;
+    
+    const h = Math.floor(exitMins / 60) % 24;
+    const m = exitMins % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  };
+
+  const estimatedExitTime = calculateEstimatedExit();
+
+  const handleSaveDay = () => {
+    setHistory({
+      ...history,
+      [selectedDate]: {
+        shifts,
+        totalMinutes: totalWorkedMinutes,
+        targetMinutes,
+        balanceMinutes,
+        justification
+      }
+    });
+    alert('Jornada salva com sucesso!');
+  };
+
+  const handleClearDay = () => {
+    if (confirm('Deseja limpar os registros desta data?')) {
+      const newHist = { ...history };
+      delete newHist[selectedDate];
+      setHistory(newHist);
+      setShifts([{ id: Date.now(), entry: '07:00', exit: '' }]);
+      setJustification('');
+    }
+  };
+
+  // Alternar expansão do mês
+  const toggleMonthAccordion = (monthKey) => {
+    setExpandedMonths(prev => ({
+      ...prev,
+      [monthKey]: !prev[monthKey]
+    }));
+  };
+
+  // Agrupar histórico por mês
+  const groupedHistory = Object.keys(history).sort().reverse().reduce((acc, dateStr) => {
+    const monthKey = dateStr.substring(0, 7); // YYYY-MM
+    if (!acc[monthKey]) acc[monthKey] = [];
+    acc[monthKey].push({ date: dateStr, ...history[dateStr] });
+    return acc;
+  }, {});
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col p-4 sm:p-6 lg:p-8 font-sans antialiased relative overflow-x-hidden">
-      <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
-        <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl"></div>
-        <div className="absolute top-1/2 -right-40 w-96 h-96 bg-emerald-600/10 rounded-full blur-3xl"></div>
-      </div>
-
-      <div className="max-w-4xl mx-auto w-full space-y-6">
-        {/* Cabeçalho */}
-        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-5">
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-950/70 border border-indigo-800/60 text-indigo-400 text-xs font-medium">
-              <Clock className="w-3.5 h-3.5" />
-              Gestão de Expediente Inteligente
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-2">
-              <Crown className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-400 fill-indigo-500/20" />
-              Calculadora de Ponto{" "}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-emerald-400 ml-1">
-                V PRO
-              </span>
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+      {/* Header */}
+      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-20 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <div className="bg-indigo-600/20 p-2 rounded-xl border border-indigo-500/30 text-indigo-400">
+            <Crown className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+              Calculadora de Ponto V PRO
             </h1>
-            <p className="text-slate-400 text-sm mt-1">
-              Descubra a hora exata da sua saída sem estourar nem dever minutos.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={preencherSugestao}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg bg-slate-900 border border-slate-700/80 hover:bg-slate-800 text-slate-300 transition-colors"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Sugestão
-              Automática
-            </button>
-          </div>
-        </header>
-
-        {/* Data e Jornada Contratual Inteligente */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-slate-900/80 border border-slate-800/90 rounded-2xl p-4 shadow-sm">
-            <label className="flex items-center gap-2 text-xs font-semibold text-slate-300 mb-2">
-              <Calendar className="w-4 h-4 text-indigo-400" /> Data do Registro
-            </label>
-            <input
-              type="date"
-              value={dataRegistro}
-              onChange={(e) => handleMudancaData(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all [color-scheme:dark]"
-            />
-          </div>
-
-          <div className="md:col-span-2 bg-slate-900/90 backdrop-blur border border-slate-800 p-4 rounded-2xl shadow-lg flex flex-col justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2">
-              <Briefcase className="w-4 h-4 text-indigo-400" /> Jornada
-              Selecionada (Detectada pela Data)
-            </span>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => setTargetType("9")}
-                className={`py-2 px-2 rounded-xl border text-center transition-all ${targetType === "9" ? "bg-indigo-600/20 border-indigo-500 text-indigo-300 ring-1 ring-indigo-500/50" : "bg-slate-800/60 border-slate-700/70 text-slate-300 hover:bg-slate-800"}`}
-              >
-                <span className="text-sm font-bold block">9h</span>
-                <span className="text-[10px] text-slate-400">Seg a Qui</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setTargetType("8")}
-                className={`py-2 px-2 rounded-xl border text-center transition-all ${targetType === "8" ? "bg-indigo-600/20 border-indigo-500 text-indigo-300 ring-1 ring-indigo-500/50" : "bg-slate-800/60 border-slate-700/70 text-slate-300 hover:bg-slate-800"}`}
-              >
-                <span className="text-sm font-bold block">8h</span>
-                <span className="text-[10px] text-emerald-400">
-                  Sexta-feira
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setTargetType("custom")}
-                className={`py-2 px-2 rounded-xl border text-center transition-all ${targetType === "custom" ? "bg-indigo-600/20 border-indigo-500 text-indigo-300 ring-1 ring-indigo-500/50" : "bg-slate-800/60 border-slate-700/70 text-slate-300 hover:bg-slate-800"}`}
-              >
-                <span className="text-sm font-bold block">Outro</span>
-                <span className="text-[10px] text-slate-400">Customizado</span>
-              </button>
-            </div>
+            <p className="text-xs text-slate-400">Gerenciamento Inteligente de Jornada</p>
           </div>
         </div>
 
-        {targetType === "custom" && (
-          <div className="flex items-center gap-3 bg-slate-900/80 p-3 rounded-xl border border-slate-800">
-            <label className="text-xs text-slate-300">
-              Duração diária desejada:
-            </label>
-            <input
-              type="time"
-              value={customHours}
-              onChange={(e) => setCustomHours(e.target.value)}
-              className="bg-slate-950 border border-slate-700 text-white rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-indigo-500 [color-scheme:dark]"
-            />
-          </div>
-        )}
-
-        {/* Entradas e Saídas */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {batidas.map((hora, index) => {
-            const config = getTurnConfig(index)
-            return (
-              <div
-                key={index}
-                className="bg-slate-900/80 border border-slate-800/90 rounded-2xl p-4 shadow-sm"
-              >
-                <label className="flex items-center gap-2 text-xs font-semibold text-slate-300 mb-3">
-                  {config.icon} {config.label}
-                </label>
-                <input
-                  type="time"
-                  value={hora}
-                  onChange={(e) => atualizarBatida(index, e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-3 text-lg font-mono text-center text-slate-100 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all [color-scheme:dark]"
-                />
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Botões de Adicionar e Remover Turno */}
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex items-center space-x-2 bg-slate-900 p-1 rounded-xl border border-slate-800">
           <button
-            onClick={adicionarTurno}
-            className="flex-1 py-3 rounded-xl border border-dashed border-slate-700 text-slate-400 hover:text-indigo-400 hover:border-indigo-500/50 hover:bg-indigo-500/5 transition-all flex items-center justify-center gap-2 text-sm font-medium"
+            onClick={() => setActiveTab('calc')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center space-x-1.5 ${
+              activeTab === 'calc' 
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' 
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
           >
-            <Plus className="w-4 h-4" /> Adicionar Turno Extra
-          </button>
-          {batidas.length > 4 && (
-            <button
-              onClick={removerTurno}
-              className="flex-1 py-3 rounded-xl border border-dashed border-rose-900/50 text-rose-500/70 hover:text-rose-400 hover:border-rose-500/50 hover:bg-rose-500/5 transition-all flex items-center justify-center gap-2 text-sm font-medium"
-            >
-              <Crown className="w-4 h-4 text-indigo-400" /> Remover Último Turno
-              Adicionado
-            </button>
-          )}
-        </div>
-
-        {/* Justificativa */}
-        <div className="bg-slate-900/80 border border-slate-800/90 rounded-2xl p-4 shadow-sm">
-          <label className="flex items-center gap-2 text-xs font-semibold text-slate-300 mb-2">
-            <FileText className="w-4 h-4 text-emerald-400" /> Justificativa /
-            Observação do Dia (Opcional)
-          </label>
-          <input
-            type="text"
-            placeholder="Ex: Saí 10 min mais cedo para compromisso..."
-            value={justificativa}
-            onChange={(e) => setJustificativa(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder-slate-600"
-          />
-        </div>
-
-        {/* Botões de Ação */}
-        <div className="flex flex-col sm:flex-row gap-3 pt-2">
-          <button
-            onClick={limparDia}
-            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium rounded-xl bg-slate-900 border border-slate-700/80 hover:bg-slate-800 text-slate-400 transition-colors"
-          >
-            <RotateCcw className="w-4 h-4" /> Limpar Formulário
+            <Calculator className="w-3.5 h-3.5" />
+            <span>Registro</span>
           </button>
           <button
-            onClick={salvarDia}
-            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 transition-colors"
+            onClick={() => setActiveTab('history')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center space-x-1.5 ${
+              activeTab === 'history' 
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' 
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
           >
-            <Save className="w-4 h-4" /> Salvar Registro
+            <History className="w-3.5 h-3.5" />
+            <span>Histórico</span>
           </button>
         </div>
+      </header>
 
-        {/* Dashboard de Resultado */}
-        {sugestaoSaida && (
-          <section className="bg-gradient-to-b from-slate-900 to-slate-950 border border-indigo-950/60 rounded-3xl p-6 shadow-2xl relative overflow-hidden mt-6 flex flex-col justify-center">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      {/* Main Content */}
+      <main className="flex-1 max-w-2xl w-full mx-auto p-4 md:p-6 space-y-6">
+        {activeTab === 'calc' ? (
+          <>
+            {/* Seletor de Data e Meta */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                    Data da Jornada
+                  </label>
+                  <div className="flex items-center space-x-2">
+                    <Calendar className="w-4 h-4 text-indigo-400" />
+                    <input 
+                      type="date" 
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                      className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
 
-            <div className="relative z-10 flex flex-col items-center text-center space-y-4">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-300 text-xs font-semibold tracking-wide uppercase border border-indigo-500/20">
-                <LogOut className="w-3.5 h-3.5" /> Horário Recomendado de Saída
-              </span>
-
-              <div className="py-2 flex flex-col items-center">
-                <div className="text-6xl sm:text-7xl font-extrabold tracking-tight text-white font-mono drop-shadow-md">
-                  {sugestaoSaida}
-                </div>
-                <p className="text-xs sm:text-sm text-emerald-400 mt-3 font-medium flex items-center gap-1.5 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-                  <CheckCircle2 className="w-4 h-4" /> Bater este horário cumpre
-                  exatamente {formatMinutesHuman(targetMinutes)}
-                </p>
-              </div>
-
-              <div className="w-full max-w-lg space-y-2 pt-4">
-                <div className="flex justify-between text-xs text-slate-400 font-medium">
-                  <span>
-                    Realizado: {formatMinutesHuman(minutosTrabalhados)}
-                  </span>
-                  <span>Restante: {formatMinutesHuman(minutosRestantes)}</span>
-                </div>
-                <div className="w-full bg-slate-800 h-3 rounded-full overflow-hidden p-0.5 border border-slate-700/50">
-                  <div
-                    className="bg-gradient-to-r from-indigo-500 to-emerald-400 h-full rounded-full transition-all duration-500"
-                    style={{ width: `${progressPercent}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full pt-6 mt-4 border-t border-slate-800/80 text-left">
-                <div className="bg-slate-900/90 border border-slate-800/80 p-3.5 rounded-xl shadow-inner">
-                  <span className="text-[11px] uppercase tracking-wider text-slate-400 block mb-1">
-                    1º Turno (Manhã)
-                  </span>
-                  <span className="text-base font-semibold font-mono text-slate-200">
-                    {formatMinutesHuman(minutosManha)}
-                  </span>
-                </div>
-                <div className="bg-slate-900/90 border border-slate-800/80 p-3.5 rounded-xl shadow-inner">
-                  <span className="text-[11px] uppercase tracking-wider text-slate-400 block mb-1">
-                    Intervalo Almoço
-                  </span>
-                  <span className="text-base font-semibold font-mono text-slate-200">
-                    {formatMinutesHuman(minutosAlmoco)}
-                  </span>
-                </div>
-                <div className="bg-slate-900/90 border border-slate-800/80 p-3.5 rounded-xl shadow-inner">
-                  <span className="text-[11px] uppercase tracking-wider text-slate-400 block mb-1">
-                    A Fazer (Tarde)
-                  </span>
-                  <span className="text-base font-semibold font-mono text-indigo-400">
-                    {formatMinutesHuman(minutosRestantes)}
-                  </span>
+                <div className="bg-slate-950/60 border border-slate-800/80 px-4 py-2 rounded-xl flex items-center justify-between sm:justify-start space-x-4">
+                  <div>
+                    <span className="block text-[10px] text-slate-400 uppercase tracking-wider">Meta Diária</span>
+                    <span className="text-sm font-bold text-slate-200">{minutesToHoursAndMinutes(targetMinutes)}</span>
+                  </div>
+                  <div className="h-6 w-[1px] bg-slate-800"></div>
+                  <div>
+                    <span className="block text-[10px] text-slate-400 uppercase tracking-wider">Status</span>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                      targetMinutes === 480 ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' :
+                      targetMinutes === 540 ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
+                      'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                    }`}>
+                      {targetMinutes === 480 ? 'Sexta (8h)' : targetMinutes === 540 ? 'Padrão (9h)' : 'Fim de Semana'}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
-          </section>
-        )}
 
-        {/* Histórico Local */}
-        <div className="mt-12 pt-8 border-t border-slate-800/60">
-          <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center uppercase tracking-wider">
-            <Clock className="w-4 h-4 mr-2 text-indigo-400" /> Histórico (Neste
-            Aparelho)
-          </h3>
+            {/* Turnos de Ponto */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-slate-300 flex items-center space-x-2">
+                  <Clock className="w-4 h-4 text-indigo-400" />
+                  <span>Turnos e Batidas</span>
+                </h2>
+                <button
+                  onClick={handleAddShift}
+                  className="text-xs bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 px-3 py-1.5 rounded-xl transition flex items-center space-x-1 font-medium"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Adicionar Turno</span>
+                </button>
+              </div>
 
-          {Object.keys(historico).length === 0 ? (
-            <div className="text-slate-500 text-sm text-center py-8 bg-slate-900/50 rounded-xl border border-slate-800/80">
-              Nenhum registro salvo ainda.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {Object.entries(historico)
-                .reverse()
-                .map(([data, dados]) => (
-                  <div
-                    key={data}
-                    className="bg-slate-900/80 p-4 rounded-xl border border-slate-800/80 hover:border-slate-700 transition-colors flex flex-col justify-between group"
-                  >
-                    <div>
-                      <div className="flex justify-between items-center mb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-200">
-                            {data}
-                          </span>
-                          <span className="text-[11px] px-2 py-1 bg-slate-950 text-slate-400 rounded-md border border-slate-800">
-                            Meta: {dados.cargaHoraria}
-                          </span>
-                        </div>
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => editarRegistro(data)}
-                            className="p-1.5 text-slate-500 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors border border-transparent group-hover:border-slate-700"
-                            title="Editar"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => apagarRegistro(data)}
-                            className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors border border-transparent group-hover:border-slate-700"
-                            title="Apagar"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+              <div className="space-y-3">
+                {shifts.map((shift, index) => (
+                  <div key={shift.id} className="flex items-center space-x-3 bg-slate-950/50 p-3 rounded-xl border border-slate-800/80">
+                    <span className="text-xs font-bold text-slate-500 w-6">#{index + 1}</span>
+                    <div className="flex-1 grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] text-slate-400 mb-1">Entrada</label>
+                        <input 
+                          type="time" 
+                          value={shift.entry}
+                          onChange={(e) => handleShiftChange(shift.id, 'entry', e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                        />
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        {dados.batidas.map((hora, idx) => {
-                          if (!hora) return null
-                          const isEntrada = idx % 2 === 0
-                          const turnoNum = Math.floor(idx / 2) + 1
-                          return (
-                            <span
-                              key={idx}
-                              className={`text-xs font-mono px-2 py-1 rounded border ${isEntrada ? "bg-indigo-500/10 text-indigo-300 border-indigo-500/20" : "bg-orange-500/10 text-orange-300 border-orange-500/20"}`}
-                            >
-                              <strong className="opacity-70">
-                                {isEntrada ? `E${turnoNum}:` : `S${turnoNum}:`}
-                              </strong>{" "}
-                              {hora}
-                            </span>
-                          )
-                        })}
+                      <div>
+                        <label className="block text-[10px] text-slate-400 mb-1">Saída</label>
+                        <input 
+                          type="time" 
+                          value={shift.exit}
+                          onChange={(e) => handleShiftChange(shift.id, 'exit', e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                        />
                       </div>
                     </div>
-                    {dados.justificativa && (
-                      <div className="mt-4 pt-3 border-t border-slate-800/60">
-                        <p className="text-xs text-slate-400 bg-slate-950/50 p-2.5 rounded-lg border border-slate-800/50 flex items-start gap-2">
-                          <FileText className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />
-                          <span className="italic">{dados.justificativa}</span>
-                        </p>
-                      </div>
-                    )}
+                    <button
+                      onClick={() => handleRemoveShift(shift.id)}
+                      className="text-slate-500 hover:text-red-400 p-2 transition rounded-lg hover:bg-red-500/10 mt-5"
+                      title="Remover turno"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 ))}
+              </div>
             </div>
-          )}
-        </div>
 
-        {/* Assinatura */}
-        <div className="mt-8 pb-6 text-center space-y-2">
-          <p className="text-slate-500 text-sm flex items-center justify-center gap-2">
-            <span className="w-8 h-[1px] bg-slate-700/50"></span>
-            Desenvolvido por
-            <span className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-emerald-400 tracking-wider">
-              Valdiney
-            </span>
-            <span className="w-8 h-[1px] bg-slate-700/50"></span>
-          </p>
-          <p className="text-xs text-slate-600 flex items-center justify-center gap-1.5">
-            Dedicado à Luana{" "}
-            <Heart className="w-3 h-3 text-rose-500 fill-rose-500 animate-pulse drop-shadow-[0_0_8px_rgba(244,63,94,0.4)]" />
-          </p>
-        </div>
-      </div>
+            {/* Justificativa (Opcional) */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-2">
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                Justificativa / Observação (Opcional)
+              </label>
+              <input 
+                type="text" 
+                value={justification}
+                onChange={(e) => setJustification(e.target.value)}
+                placeholder="Ex: Saída médica, compensação de horas, etc."
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+              />
+            </div>
 
-      {/* Toast Notification */}
-      <div
-        className={`fixed bottom-6 right-6 sm:bottom-10 sm:right-10 z-50 transition-all duration-500 transform ${toast.show ? "translate-y-0 opacity-100" : "translate-y-10 opacity-0 pointer-events-none"}`}
-      >
-        <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700/80 shadow-2xl shadow-indigo-500/10 rounded-2xl p-4 flex items-center gap-3">
-          <div className="bg-emerald-500/20 p-1.5 rounded-full">
-            <Bell className="w-5 h-5 text-emerald-400 animate-bounce" />
+            {/* Card de Resultados e Previsão */}
+            <div className="bg-gradient-to-br from-indigo-950/40 via-slate-900 to-slate-900 border border-indigo-500/30 rounded-2xl p-5 shadow-2xl space-y-4">
+              <h2 className="text-sm font-semibold text-indigo-300 uppercase tracking-wider">Resumo da Jornada</h2>
+              
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="bg-slate-950/60 border border-slate-800 p-3 rounded-xl">
+                  <span className="block text-[10px] text-slate-400 uppercase tracking-wider mb-1">Trabalhadas</span>
+                  <span className="text-base md:text-lg font-bold text-slate-100">{minutesToHoursAndMinutes(totalWorkedMinutes)}</span>
+                </div>
+                <div className="bg-slate-950/60 border border-slate-800 p-3 rounded-xl">
+                  <span className="block text-[10px] text-slate-400 uppercase tracking-wider mb-1">Previsão Saída</span>
+                  <span className="text-base md:text-lg font-bold text-cyan-400">{estimatedExitTime || '--:--'}</span>
+                </div>
+                <div className="bg-slate-950/60 border border-slate-800 p-3 rounded-xl">
+                  <span className="block text-[10px] text-slate-400 uppercase tracking-wider mb-1">Saldo</span>
+                  <span className={`text-base md:text-lg font-bold ${balanceMinutes >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {balanceMinutes >= 0 ? `+${minutesToHoursAndMinutes(balanceMinutes)}` : minutesToHoursAndMinutes(balanceMinutes)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end space-x-3 pt-2">
+                {history[selectedDate] && (
+                  <button
+                    onClick={handleClearDay}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition"
+                  >
+                    Excluir Registro
+                  </button>
+                )}
+                <button
+                  onClick={handleSaveDay}
+                  className="px-5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 transition flex items-center space-x-1.5"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Salvar Jornada</span>
+                </button>
+              </div>
+            </div>
+          </>
+        ) : (
+          /* Aba de Histórico em Acordeons Mensais */
+          <div className="space-y-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+              <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider flex items-center space-x-2">
+                <History className="w-4 h-4 text-indigo-400" />
+                <span>Histórico de Jornadas por Mês</span>
+              </h2>
+
+              {Object.keys(groupedHistory).length === 0 ? (
+                <div className="text-center py-10 text-slate-500 text-sm">
+                  Nenhum registro salvo no histórico ainda.
+                </div>
+              ) : (
+                Object.keys(groupedHistory).map(monthKey => {
+                  const monthName = new Date(monthKey + '-01T00:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+                  const days = groupedHistory[monthKey];
+                  
+                  const totalMonthMinutes = days.reduce((acc, d) => acc + d.totalMinutes, 0);
+                  const totalMonthTarget = days.reduce((acc, d) => acc + d.targetMinutes, 0);
+                  const monthBalance = totalMonthMinutes - totalMonthTarget;
+                  const isExpanded = !!expandedMonths[monthKey];
+
+                  return (
+                    <div key={monthKey} className="bg-slate-950/40 border border-slate-800 rounded-xl overflow-hidden transition">
+                      {/* Cabeçalho do Acordeon do Mês (Clicável) */}
+                      <button
+                        onClick={() => toggleMonthAccordion(monthKey)}
+                        className="w-full px-4 py-3.5 flex items-center justify-between bg-slate-950/80 hover:bg-slate-9orge/60 transition text-left"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className="text-indigo-400">
+                            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          </div>
+                          <div>
+                            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider capitalize">{monthName}</h3>
+                            <span className="text-[10px] text-slate-400">{days.length} {days.length === 1 ? 'dia registrado' : 'dias registrados'}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-3">
+                          <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${monthBalance >= 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                            Saldo: {monthBalance >= 0 ? `+${minutesToHoursAndMinutes(monthBalance)}` : minutesToHoursAndMinutes(monthBalance)}
+                          </span>
+                        </div>
+                      </button>
+
+                      {/* Conteúdo do Mês (Só aparece se expandido) */}
+                      {isExpanded && (
+                        <div className="p-3 border-t border-slate-800 space-y-2 bg-slate-950/20">
+                          {days.map(item => (
+                            <div 
+                              key={item.date} 
+                              onClick={() => { setSelectedDate(item.date); setActiveTab('calc'); }}
+                              className="bg-slate-900/60 border border-slate-800/80 hover:border-indigo-500/50 p-3 rounded-xl transition cursor-pointer flex items-center justify-between"
+                            >
+                              <div className="space-y-0.5">
+                                <span className="text-xs font-medium text-slate-200">
+                                  {new Date(item.date + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })}
+                                </span>
+                                {item.justification && (
+                                  <p className="text-[10px] text-slate-400 italic">Obs: {item.justification}</p>
+                                )}
+                              </div>
+                              <div className="text-right space-y-0.5">
+                                <span className="text-xs font-bold text-slate-200">{minutesToHoursAndMinutes(item.totalMinutes)}</span>
+                                <span className={`block text-[10px] font-semibold ${item.balanceMinutes >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                  {item.balanceMinutes >= 0 ? `+${minutesToHoursAndMinutes(item.balanceMinutes)}` : minutesToHoursAndMinutes(item.balanceMinutes)}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
-          <p className="text-sm font-medium text-slate-200 pr-2">
-            {toast.message}
-          </p>
-        </div>
-      </div>
+        )}
+      </main>
     </div>
-  )
+  );
 }
