@@ -32,7 +32,13 @@ export default function CalculadoraPonto() {
   const [targetType, setTargetType] = useState("9")
   const [customHours, setCustomHours] = useState("08:48")
 
-  // Função que lida com a mudança de data e já define a jornada corretamente sem usar useEffect
+  // Pede permissão para notificações nativas assim que o app carrega
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission()
+    }
+  }, [])
+
   const handleMudancaData = (novaData) => {
     setDataRegistro(novaData)
     if (novaData) {
@@ -57,11 +63,26 @@ export default function CalculadoraPonto() {
     return dadosSalvos ? JSON.parse(dadosSalvos) : {}
   })
 
-  const mostrarNotificacao = (mensagem) => {
-    setToast({ show: true, message: mensagem })
+  const dispararNotificacaoNativa = (titulo, corpo) => {
+    // Exibe o Toast interno na tela
+    setToast({ show: true, message: corpo })
     setTimeout(() => {
       setToast({ show: false, message: "" })
-    }, 4000)
+    }, 5000)
+
+    // Dispara o Popup Nativo do Sistema/Celular se permitido
+    if ("Notification" in window && Notification.permission === "granted") {
+      try {
+        new Notification(titulo, {
+          body: corpo,
+          icon: "/icone-ponto.png",
+          badge: "/icone-ponto.png",
+          vibrate: [200, 100, 200],
+        })
+      } catch (e) {
+        console.log("Notificação nativa bloqueada ou erro:", e)
+      }
+    }
   }
 
   const timeToMinutes = (timeStr) => {
@@ -96,7 +117,6 @@ export default function CalculadoraPonto() {
     return custom !== null && custom > 0 ? custom : 8 * 60
   }, [targetType, customHours])
 
-  // Cálculos Centrais
   let sugestaoSaida = null
   let minutosTrabalhados = 0
   let ultimaEntrada = 0
@@ -134,26 +154,30 @@ export default function CalculadoraPonto() {
     sugestaoSaida = formatarMinutosParaHora(horaSaidaReal)
   }
 
-  // --- MONITORES DE ALERTA INTELIGENTE ---
+  // --- MONITORES DE ALERTA NATIVO (Popup) ---
   useEffect(() => {
     const intervalo = setInterval(() => {
       const agora = new Date()
       const horaAtualStr = `${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`
 
+      // 1. Alerta de Retorno do Almoço
       if (batidas[1] && !batidas[2]) {
         const minSaidaAlmoco = timeToMinutes(batidas[1])
         const minRetornoPrevisto = minSaidaAlmoco + 60
         const horaRetornoStr = formatarMinutosParaHora(minRetornoPrevisto)
 
         if (horaAtualStr === horaRetornoStr) {
-          mostrarNotificacao(
-            `🍽️ Passou 1h do seu almoço! Hora de registrar o retorno.`,
+          dispararNotificacaoNativa(
+            "Calculadora de Ponto V PRO",
+            "🍽️ Passou 1h do seu almoço! Hora de registrar o retorno.",
           )
         }
       }
 
+      // 2. Alerta de Fim de Expediente
       if (sugestaoSaida && aguardandoSaida && horaAtualStr === sugestaoSaida) {
-        mostrarNotificacao(
+        dispararNotificacaoNativa(
+          "Calculadora de Ponto V PRO",
           `⏰ Expediente concluído! Hora de bater o ponto de saída (${sugestaoSaida}).`,
         )
       }
@@ -193,11 +217,17 @@ export default function CalculadoraPonto() {
     if (isSexta || targetType === "8") {
       setTargetType("8")
       setBatidas(["07:00", "12:00", "13:00", "16:00"])
-      mostrarNotificacao("Sugestão aplicada para Sexta-feira (8h)!")
+      dispararNotificacaoNativa(
+        "Ponto V PRO",
+        "Sugestão aplicada para Sexta-feira (8h)!",
+      )
     } else {
       setTargetType("9")
       setBatidas(["07:00", "12:00", "13:00", "17:00"])
-      mostrarNotificacao("Sugestão aplicada para padrão diário (9h)!")
+      dispararNotificacaoNativa(
+        "Ponto V PRO",
+        "Sugestão aplicada para padrão diário (9h)!",
+      )
     }
   }
 
@@ -218,7 +248,10 @@ export default function CalculadoraPonto() {
     }
     setHistorico(novoHistorico)
     localStorage.setItem("historicoPonto", JSON.stringify(novoHistorico))
-    mostrarNotificacao(`Registro do dia ${dataFormatada} salvo com sucesso!`)
+    dispararNotificacaoNativa(
+      "Ponto V PRO",
+      `Registro do dia ${dataFormatada} salvo com sucesso!`,
+    )
   }
 
   const editarRegistro = (dataBR) => {
@@ -245,7 +278,10 @@ export default function CalculadoraPonto() {
       delete novoHistorico[dataBR]
       setHistorico(novoHistorico)
       localStorage.setItem("historicoPonto", JSON.stringify(novoHistorico))
-      mostrarNotificacao(`O registro do dia ${dataBR} foi excluído.`)
+      dispararNotificacaoNativa(
+        "Ponto V PRO",
+        `O registro do dia ${dataBR} foi excluído.`,
+      )
     }
   }
 
