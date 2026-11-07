@@ -32,7 +32,6 @@ export default function CalculadoraPonto() {
   const [targetType, setTargetType] = useState("9")
   const [customHours, setCustomHours] = useState("08:48")
 
-  // Pede permissão para notificações nativas assim que o app carrega
   useEffect(() => {
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission()
@@ -64,20 +63,19 @@ export default function CalculadoraPonto() {
   })
 
   const dispararNotificacaoNativa = (titulo, corpo) => {
-    // Exibe o Toast interno na tela
     setToast({ show: true, message: corpo })
     setTimeout(() => {
       setToast({ show: false, message: "" })
-    }, 5000)
+    }, 6000)
 
-    // Dispara o Popup Nativo do Sistema/Celular se permitido
     if ("Notification" in window && Notification.permission === "granted") {
       try {
         new Notification(titulo, {
           body: corpo,
           icon: "/icone-ponto.png",
           badge: "/icone-ponto.png",
-          vibrate: [200, 100, 200],
+          vibrate: [500, 200, 500, 200, 500],
+          requireInteraction: true,
         })
       } catch (e) {
         console.log("Notificação nativa bloqueada ou erro:", e)
@@ -154,34 +152,47 @@ export default function CalculadoraPonto() {
     sugestaoSaida = formatarMinutosParaHora(horaSaidaReal)
   }
 
-  // --- MONITORES DE ALERTA NATIVO (Popup) ---
+  // --- ALGORITMO DE ALVO EXATO (Calcula a hora exata e agenda o alarme) ---
   useEffect(() => {
+    // 1. Calcula o minuto exato de retorno do almoço (se houver saída para almoço registrada e não houver retorno)
+    let alvoAlmocoMinutos = null
+    if (batidas[1] && !batidas[2]) {
+      const minSaidaAlmoco = timeToMinutes(batidas[1])
+      if (minSaidaAlmoco !== null) {
+        alvoAlmocoMinutos = minSaidaAlmoco + 60 // Ex: 12:20 + 60min = 740 (13:20)
+      }
+    }
+
+    // 2. Calcula o minuto exato de fim de expediente
+    let alvoFimMinutos = null
+    if (sugestaoSaida && aguardandoSaida) {
+      alvoFimMinutos = timeToMinutes(sugestaoSaida)
+    }
+
+    // Monitora a cada 10 segundos apenas comparando se o minuto atual alcançou o alvo calculado
     const intervalo = setInterval(() => {
       const agora = new Date()
-      const horaAtualStr = `${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`
+      const minutoAtualTotal = agora.getHours() * 60 + agora.getMinutes()
 
-      // 1. Alerta de Retorno do Almoço
-      if (batidas[1] && !batidas[2]) {
-        const minSaidaAlmoco = timeToMinutes(batidas[1])
-        const minRetornoPrevisto = minSaidaAlmoco + 60
-        const horaRetornoStr = formatarMinutosParaHora(minRetornoPrevisto)
-
-        if (horaAtualStr === horaRetornoStr) {
-          dispararNotificacaoNativa(
-            "Calculadora de Ponto V PRO",
-            "🍽️ Passou 1h do seu almoço! Hora de registrar o retorno.",
-          )
-        }
+      if (
+        alvoAlmocoMinutos !== null &&
+        minutoAtualTotal === alvoAlmocoMinutos
+      ) {
+        dispararNotificacaoNativa(
+          "Calculadora de Ponto V PRO",
+          "🍽️ Passou 1h exata do seu almoço! Hora de registrar o retorno.",
+        )
+        alvoAlmocoMinutos = null // Dispara apenas uma vez por evento
       }
 
-      // 2. Alerta de Fim de Expediente
-      if (sugestaoSaida && aguardandoSaida && horaAtualStr === sugestaoSaida) {
+      if (alvoFimMinutos !== null && minutoAtualTotal === alvoFimMinutos) {
         dispararNotificacaoNativa(
           "Calculadora de Ponto V PRO",
           `⏰ Expediente concluído! Hora de bater o ponto de saída (${sugestaoSaida}).`,
         )
+        alvoFimMinutos = null // Dispara apenas uma vez por evento
       }
-    }, 15000)
+    }, 10000)
 
     return () => clearInterval(intervalo)
   }, [batidas, sugestaoSaida, aguardandoSaida])
