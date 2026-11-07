@@ -27,7 +27,10 @@ export default function App() {
 
   const [justification, setJustification] = useState('');
   
-  // Histórico salvo no localStorage: { 'YYYY-MM-DD': { shifts: [...], totalMinutes: X, targetMinutes: Y, justification: '...' } }
+  // Estado para notificação elegante (Toast)
+  const [notification, setNotification] = useState(null);
+
+  // Histórico salvo no localStorage
   const [history, setHistory] = useState(() => {
     try {
       const saved = localStorage.getItem('v_ponto_history');
@@ -37,8 +40,16 @@ export default function App() {
     }
   });
 
-  // Estado para controlar quais meses estão expandidos no histórico (Ex: { '2026-11': true })
+  // Estado para controlar quais meses estão expandidos no histórico
   const [expandedMonths, setExpandedMonths] = useState({});
+
+  // Função para disparar notificação elegante na tela
+  const showNotification = (message, type = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => {
+      setNotification(null);
+    }, 3500);
+  };
 
   // Salvar histórico sempre que mudar
   useEffect(() => {
@@ -68,7 +79,7 @@ export default function App() {
     }
   }, [selectedDate]);
 
-  // Determinar meta diária com base no dia da semana (Seg-Qui = 9h / 540m, Sex = 8h / 480m)
+  // Determinar meta diária (Seg-Qui = 9h / 540m, Sex = 8h / 480m)
   const getTargetMinutesForDate = (dateStr) => {
     const d = new Date(dateStr + 'T00:00:00');
     const dayOfWeek = d.getDay();
@@ -142,7 +153,7 @@ export default function App() {
     });
 
     const remainingNeeded = targetMinutes - completedMins;
-    if (remainingNeeded <= 0) return 'Meta já atingida!';
+    if (remainingNeeded <= 0) return 'Meta atingida!';
 
     const entryMins = timeToMinutes(lastShift.entry);
     const exitMins = entryMins + remainingNeeded;
@@ -165,7 +176,7 @@ export default function App() {
         justification
       }
     });
-    alert('Jornada salva com sucesso!');
+    showNotification('Jornada salva com sucesso no histórico!', 'success');
   };
 
   const handleClearDay = () => {
@@ -175,10 +186,10 @@ export default function App() {
       setHistory(newHist);
       setShifts([{ id: Date.now(), entry: '07:00', exit: '' }]);
       setJustification('');
+      showNotification('Registro excluído com sucesso.', 'info');
     }
   };
 
-  // Alternar expansão do mês
   const toggleMonthAccordion = (monthKey) => {
     setExpandedMonths(prev => ({
       ...prev,
@@ -186,16 +197,30 @@ export default function App() {
     }));
   };
 
-  // Agrupar histórico por mês
   const groupedHistory = Object.keys(history).sort().reverse().reduce((acc, dateStr) => {
-    const monthKey = dateStr.substring(0, 7); // YYYY-MM
+    const monthKey = dateStr.substring(0, 7);
     if (!acc[monthKey]) acc[monthKey] = [];
     acc[monthKey].push({ date: dateStr, ...history[dateStr] });
     return acc;
   }, {});
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans relative">
+      
+      {/* Toast Notification Flutuante Elegante */}
+      {notification && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 w-11/12 max-w-md animate-bounce">
+          <div className="bg-slate-900 border border-indigo-500/50 shadow-2xl rounded-2xl p-4 flex items-center space-x-3 backdrop-blur-xl">
+            <div className="bg-indigo-600/20 text-indigo-400 p-2 rounded-xl border border-indigo-500/30">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-semibold text-slate-200">{notification.message}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-20 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center space-x-3">
@@ -206,7 +231,7 @@ export default function App() {
             <h1 className="text-lg font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
               Calculadora de Ponto V PRO
             </h1>
-            <p className="text-xs text-slate-400">Gerenciamento Inteligente de Jornada</p>
+            <p className="text-xs text-slate-400">Desenvolvido por Valdiney Silva</p>
           </div>
         </div>
 
@@ -330,7 +355,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Justificativa (Opcional) */}
+            {/* Justificativa */}
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-2">
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
                 Justificativa / Observação (Opcional)
@@ -344,7 +369,7 @@ export default function App() {
               />
             </div>
 
-            {/* Card de Resultados e Previsão */}
+            {/* Card de Resultados */}
             <div className="bg-gradient-to-br from-indigo-950/40 via-slate-900 to-slate-900 border border-indigo-500/30 rounded-2xl p-5 shadow-2xl space-y-4">
               <h2 className="text-sm font-semibold text-indigo-300 uppercase tracking-wider">Resumo da Jornada</h2>
               
@@ -385,7 +410,7 @@ export default function App() {
             </div>
           </>
         ) : (
-          /* Aba de Histórico em Acordeons Mensais */
+          /* Aba de Histórico com Acordeons Mensais */
           <div className="space-y-4">
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
               <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider flex items-center space-x-2">
@@ -409,10 +434,9 @@ export default function App() {
 
                   return (
                     <div key={monthKey} className="bg-slate-950/40 border border-slate-800 rounded-xl overflow-hidden transition">
-                      {/* Cabeçalho do Acordeon do Mês (Clicável) */}
                       <button
                         onClick={() => toggleMonthAccordion(monthKey)}
-                        className="w-full px-4 py-3.5 flex items-center justify-between bg-slate-950/80 hover:bg-slate-9orge/60 transition text-left"
+                        className="w-full px-4 py-3.5 flex items-center justify-between bg-slate-950/80 hover:bg-slate-900/60 transition text-left"
                       >
                         <div className="flex items-center space-x-3">
                           <div className="text-indigo-400">
@@ -431,7 +455,6 @@ export default function App() {
                         </div>
                       </button>
 
-                      {/* Conteúdo do Mês (Só aparece se expandido) */}
                       {isExpanded && (
                         <div className="p-3 border-t border-slate-800 space-y-2 bg-slate-950/20">
                           {days.map(item => (
