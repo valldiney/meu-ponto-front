@@ -231,7 +231,7 @@ export default function App() {
             <h1 className="text-lg font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
               Calculadora de Ponto V PRO
             </h1>
-            <p className="text-xs text-slate-400">Desenvolvido por Valdiney Silva</p>
+            <p className="text-xs text-slate-400">Gerenciamento Inteligente de Jornada</p>
           </div>
         </div>
 
